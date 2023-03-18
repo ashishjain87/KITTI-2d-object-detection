@@ -29,6 +29,15 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import NullLocator
 import random
+import yaml
+
+def setup_logging(logging_config_path: str = 'logging.yaml', default_level: int = logging.INFO) -> None:
+    if os.path.exists(logging_config_path):
+        with open(logging_config_path, 'rt') as file:
+            config = yaml.safe_load(file.read())
+        logging.config.dictConfig(config)
+    else:
+        logging.basicConfig(level=default_level)
 
 def get_filename_without_ext(path: str) -> str:
     filename_with_ext = os.path.basename(path)
@@ -175,7 +184,17 @@ def detect(
 
         logger.info('For sample %s, saved output annotated image to %s' % (sample, outputImageFilePath))
 
+def main():
+    # Logging Setup
+    setup_logging()
+    logger = logging.getLogger(__name__)
+    logger.info('Started')
 
-if __name__ == '__main__':
+    # Run the model
     torch.multiprocessing.freeze_support()
     detect()
+
+    logger.info('Finished')
+
+if __name__ == '__main__':
+    main()
