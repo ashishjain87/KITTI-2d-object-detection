@@ -26,6 +26,7 @@ from tqdm import tqdm
 
 from dataset import ImageFolder
 
+import argparse
 import numpy as np
 import pandas as pd
 import torch
@@ -202,9 +203,20 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info('Started')
 
+    # Get inputs
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--path-model-weights', type=str, default='../checkpoints/best_weights_kitti.pth', help='path to model weights')
+    parser.add_argument('--path-model-config', type=str, default='../config/yolov3-kitti.cfg', help='path to model configuration')
+    parser.add_argument('--path-model-classes', type=str, default='../data/names.txt', help='path to classes supported by the model')
+    parser.add_argument('--path-input-images', type=str, default='../data/samples/', help='path to input images directory')
+    parser.add_argument('--path-output-labels', type=str, default='../output/annotations/', help='path to directory where to write the predicted labels to')
+    args = parser.parse_args()
+    logger.info('Using arguments values: %s' % args)
+
     # Run the model
     torch.multiprocessing.freeze_support()
-    detect()
+    detect(pathToModelWeights=args.path_model_weights, pathToConfig=args.path_model_config, pathToClasses=args.path_model_classes,
+           pathToInputImages=args.path_input_images, pathToOutputPredictedLabelsDirectory=args.path_output_labels)
 
     logger.info('Finished')
 
