@@ -146,7 +146,7 @@ def detect(
         # Draw bounding boxes and labels of detections
         if detections is not None:
             logger.debug("Type of detections: %s" % type(detections))
-            logger.debug("Number of detections: %s" % detections.size())
+            logger.debug("Number of detections: {0}".format(detections.size()))
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
             bbox_colors = random.sample(colors, n_cls_preds)
