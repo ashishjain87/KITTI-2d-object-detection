@@ -2,7 +2,7 @@
 """
 Created on Sun Apr 14 12:47:01 2019
 
-@author: Keshik
+@author: Keshik, Ashish
 
 Source
     https://github.com/packyan/PyTorch-YOLOv3-kitti
@@ -10,12 +10,14 @@ Source
 
 from __future__ import division
 
+import os
+import datetime
+import logging
+import logging.config
+import time
+
 from model import Darknet
 from utils import non_max_suppression, load_classes
-
-import os
-import time
-import datetime
 
 import torch
 from torch.utils.data import DataLoader
@@ -28,7 +30,18 @@ import matplotlib.patches as patches
 from matplotlib.ticker import NullLocator
 import random
 
-def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path = '../config/yolov3-kitti.cfg', class_path = '../data/names.txt'):
+def get_filename_without_ext(path: str) -> str:
+    filename_with_ext = os.path.basename(path)
+    list = os.path.splitext(filename_with_ext)
+    return list[0]
+
+def detect(
+        pathToModelWeights: str = '../checkpoints/best_weights_kitti.pth',
+        pathToConfig: str = '../config/yolov3-kitti.cfg',
+        pathToClasses: str = '../data/names.txt',
+        pathToInputImages: str = '../data/samples/',
+        pathToOutputAnnotationsDirectory: str = '../output/annotations/',
+        pathToOutputImagesDirectory: str = '../output/'):
     """
         Script to run inference on sample images. It will store all the inference results in /output directory (relative to repo root)
         
@@ -38,31 +51,42 @@ def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path 
             class_path: Path of class names txt file
             
     """
-    cuda = torch.cuda.is_available()
-    os.makedirs('../output', exist_ok=True)
+    logger = logging.getLogger(__name__)
+
+
+    if not os.path.exists(pathToOutputImagesDirectory):
+        logger.info("Creating output directory: %s" % pathToOutputImagesDirectory)
+        os.makedirs(pathToOutputImagesDirectory, exist_ok=True)
+
+    if not os.path.exists(pathToOutputAnnotationsDirectory):
+        logger.info("Creating output directory: %s" % pathToOutputAnnotationsDirectory)
+        os.makedirs(pathToOutputAnnotationsDirectory, exist_ok=True)
 
     # Set up model
-    model = Darknet(config_path, img_size=416)
-    model.load_weights(kitti_weights)
+    model = Darknet(pathToConfig, img_size=416)
+    model.load_weights(pathToModelWeights)
+    logger.debug("Model loaded successfully. Loaded weights from: %s" % pathToModelWeights)
 
+    cuda = torch.cuda.is_available()
     if cuda:
+        logger.info("Cuda available for inference: %s" % cuda)
         model.cuda()
-        print("Cuda available for inference")
 
     model.eval() # Set in evaluation mode
+    logger.debug("Model set in evaluation mode successfully")
 
-    dataloader = DataLoader(ImageFolder("../data/samples/", img_size=416),
+    dataloader = DataLoader(ImageFolder(pathToInputImages, img_size=416),
                             batch_size=2, shuffle=False, num_workers=0)
 
-    classes = load_classes(class_path) # Extracts class labels from file
+    classes = load_classes(pathToClasses) # Extracts class labels from file
 
     Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
     imgs = []           # Stores image paths
     img_detections = [] # Stores detections for each image index
 
-    print('data size : %d' % len(dataloader) )
-    print ('\nPerforming object detection:')
+    logger.info('data size : %d' % len(dataloader) )
+    logger.info('Performing object detection:')
     prev_time = time.time()
     for batch_i, (img_paths, input_imgs) in enumerate(dataloader):
         # Configure input
@@ -72,13 +96,13 @@ def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path 
         with torch.no_grad():
             detections = model(input_imgs)
             detections = non_max_suppression(detections, 80, 0.8, 0.4)
-            #print(detections)
+            logger.info(detections)
 
         # Log progress
         current_time = time.time()
         inference_time = datetime.timedelta(seconds=current_time - prev_time)
         prev_time = current_time
-        print ('\t+ Batch %d, Inference Time: %s' % (batch_i, inference_time))
+        logger.info('\t+ Batch %d, Inference Time: %s' % (batch_i, inference_time))
 
         # Save image and detections
         imgs.extend(img_paths)
@@ -89,11 +113,11 @@ def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path 
     cmap = plt.get_cmap('tab10')
     colors = [cmap(i) for i in np.linspace(0, 1, 20)]
 
-    print ('\nSaving images:')
+    logger.info('Saving images:')
     # Iterate through images and save plot of detections
     for img_i, (path, detections) in enumerate(zip(imgs, img_detections)):
 
-        print ("(%d) Image: '%s'" % (img_i, path))
+        logger.info("(%d) Image: '%s'" % (img_i, path))
 
         # Create plot
         img = np.array(Image.open(path))
@@ -112,19 +136,20 @@ def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path 
 
         # Draw bounding boxes and labels of detections
         if detections is not None:
-            print(type(detections))
-            print(detections.size())
+            logger.debug("Type of detections: %s" % type(detections))
+            logger.debug("Number of detections: %s" % detections.size())
             unique_labels = detections[:, -1].cpu().unique()
             n_cls_preds = len(unique_labels)
             bbox_colors = random.sample(colors, n_cls_preds)
             for x1, y1, x2, y2, conf, cls_conf, cls_pred in detections:
-
-                print ('\t+ Label: %s, Conf: %.5f' % (classes[int(cls_pred)], cls_conf.item()))
+                logger.debug('\t+ Label: %s, Conf: %.5f' % (classes[int(cls_pred)], cls_conf.item()))
                 # Rescale coordinates to original dimensions
                 box_h = int(((y2 - y1) / unpad_h) * (img.shape[0]))
                 box_w = int(((x2 - x1) / unpad_w) * (img.shape[1]) )
                 y1 = int(((y1 - pad_y // 2) / unpad_h) * (img.shape[0]))
                 x1 = int(((x1 - pad_x // 2) / unpad_w) * (img.shape[1]))
+                logger.debug('\t+ Class: %s, Conf: %.5f' % (classes[int(cls_pred)], cls_conf.item())) 
+                logger.debug('\t+ Rescaled bounding box coordinates: (%d, %d), (%d, %d)' % (x1, y1, x1 + box_w, y1 + box_h))
 
                 color = bbox_colors[int(np.where(unique_labels == int(cls_pred))[0])]
                 # Create a Rectangle patch
@@ -141,8 +166,14 @@ def detect(kitti_weights = '../checkpoints/best_weights_kitti.pth', config_path 
         plt.axis('off')
         plt.gca().xaxis.set_major_locator(NullLocator())
         plt.gca().yaxis.set_major_locator(NullLocator())
-        plt.savefig('../output/%d.png' % (img_i), bbox_inches='tight', pad_inches=0.0)
+
+        sample = get_filename_without_ext(path)
+        outputImageFileName = "{sample}.{extension}".format(sample = sample, extension = "png")
+        outputImageFilePath = os.path.join(pathToOutputImagesDirectory, outputImageFileName)
+        plt.savefig(outputImageFilePath, bbox_inches='tight', pad_inches=0.0)
         plt.close()
+
+        logger.info('For sample %s, saved output annotated image to %s' % (sample, outputImageFilePath))
 
 
 if __name__ == '__main__':
