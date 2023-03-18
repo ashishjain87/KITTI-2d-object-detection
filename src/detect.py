@@ -78,7 +78,7 @@ def write_predicted_labels_to_file(pathToOutputPredictedLabelsDirectory: str, sa
     outputPredictedLabelsFilePath = os.path.join(pathToOutputPredictedLabelsDirectory, outputPredictedLabelsFileName)
 
     columnOrder =['label', 'truncated', 'occluded', 'alpha', 'bbox_xmin', 'bbox_ymin', 'bbox_xmax', 'bbox_ymax', 'dim_height', 'dim_width', 'dim_length', 'loc_x', 'loc_y', 'loc_z', 'rotation_y', 'score' ]
-    predictedLabelsDataFrame[columnOrder].to_csv(outputPredictedLabelsFilePath, columns=columnOrder, index=False, header=True, sep=" ")
+    predictedLabelsDataFrame[columnOrder].to_csv(outputPredictedLabelsFilePath, columns=columnOrder, index=False, header=False, sep=" ")
     logger.info('For sample %s, saved output annotated image to %s' % (sample, outputPredictedLabelsFilePath))
 
 def detect(
