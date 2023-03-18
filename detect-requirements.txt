@@ -1,0 +1,7 @@
+Pillow
+imgaug
+numpy
+pandas
+pyyaml
+torch==1.13.1
+tqdm
